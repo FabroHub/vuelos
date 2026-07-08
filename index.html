@@ -122,6 +122,60 @@
     .retraso {
       color: #ef4444;
     }
+
+    /* --- RESPONSIVE PARA DISPOSITIVOS DE MENOS DE 425PX --- */
+    @media (max-width: 425px) {
+      body {
+        padding: 10px;
+      }
+      
+      header {
+        padding: 15px 10px;
+        margin-bottom: 15px;
+      }
+
+      header h1 {
+        font-size: 1.1rem;
+        letter-spacing: 1px;
+      }
+
+      header p {
+        font-size: 0.75rem;
+      }
+
+      .filtro-contenedor {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .filtro-contenedor label {
+        font-size: 0.8rem;
+      }
+
+      .filtro-contenedor select {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 0.85rem;
+        padding: 10px;
+      }
+
+      .titulo-dia {
+        font-size: 0.95rem;
+        padding: 8px 10px;
+      }
+
+      .tabla-vuelos th {
+        padding: 10px 8px;
+        font-size: 0.8rem;
+      }
+
+      .fila-vuelo td {
+        padding: 12px 8px;
+        font-size: 0.9rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -147,9 +201,8 @@
   <script>
     let vuelosCargados = [];
 
-    // Diccionario de ayuda para aeropuertos comunes desde HHN si la API no da el país
     const mapaPaises = {
-'PMI': 'España', 'BCN': 'España', 'ALC': 'España', 'AGP': 'España', 'TFS': 'España', 
+      'PMI': 'España', 'BCN': 'España', 'ALC': 'España', 'AGP': 'España', 'TFS': 'España', 
       'ACE': 'España', 'IBZ': 'España', 'VLC': 'España', 'SVQ': 'España', 'SCQ': 'España',
       'MAD': 'España', 'GRO': 'España', 'REU': 'España',
       'BGY': 'Italia', 'CIA': 'Italia', 'VCE': 'Italia', 'TSF': 'Italia', 'NAP': 'Italia', 
@@ -171,31 +224,24 @@
     };
 
     function obtenerPais(f) {
-      // 1. Intentar leerlo si viene en la API
       if (f.airport.destination && f.airport.destination.country && f.airport.destination.country.name) {
         return f.airport.destination.country.name;
       }
-      
-      // 2. Buscar en nuestro mapa local por código IATA
       const iata = f.airport.destination ? f.airport.destination.code.iata : '';
       if (mapaPaises[iata]) {
         return mapaPaises[iata];
       }
-
-      // 3. Intentar deducirlo si el nombre del aeropuerto incluye una coma (ej: "Palma de Mallorca, Spain")
       const nombre = f.airport.destination ? f.airport.destination.name : '';
       if (nombre.includes(',')) {
         const partes = nombre.split(',');
         return partes[partes.length - 1].trim();
       }
-
       return '---';
     }
 
     function traducirEstado(estadoIngles) {
       if (!estadoIngles) return 'Programado';
       const texto = estadoIngles.toLowerCase();
-      
       if (texto.includes('departed')) return 'Despegó';
       if (texto.includes('estimated')) return 'Estimado';
       if (texto.includes('delayed')) return '<span class="retraso">Retrasado</span>';
@@ -203,16 +249,13 @@
       if (texto.includes('landed')) return 'Aterrizó';
       if (texto.includes('scheduled')) return 'Programado';
       if (texto.includes('board') || texto.includes('gate')) return 'Embarcando';
-      
       return estadoIngles;
     }
 
     function actualizarDesplegableAerolineas(vuelos) {
       const select = document.getElementById('filtro-aerolinea');
       const opcionSeleccionada = select.value;
-      
       select.innerHTML = '<option value="TODAS">-- TODAS LAS AEROLÍNEAS --</option>';
-      
       const aerolineasUnicas = [...new Set(vuelos.map(item => item.flight.airline ? item.flight.airline.name : 'Desconocida'))].sort();
       
       aerolineasUnicas.forEach(aerolinea => {
@@ -231,7 +274,6 @@
       const hoy = new Date();
       const mañana = new Date();
       mañana.setDate(hoy.getDate() + 1);
-
       const fechaVuelo = new Date(fechaStr + "T00:00:00");
 
       if (fechaVuelo.toDateString() === hoy.toDateString()) {
@@ -246,7 +288,6 @@
     function renderizarTabla() {
       const contenedor = document.getElementById('contenedor-paneles');
       const filtroSeleccionado = document.getElementById('filtro-aerolinea').value;
-      
       contenedor.innerHTML = '';
 
       const vuelosFiltrados = vuelosCargados.filter(item => {
@@ -261,12 +302,10 @@
       }
 
       const vuelosAgrupadosPorDia = {};
-      
       vuelosFiltrados.forEach(item => {
         const timestamp = item.flight.time.scheduled.departure * 1000;
         const fechaObj = new Date(timestamp);
         const claveFecha = fechaObj.toISOString().split('T')[0]; 
-
         if (!vuelosAgrupadosPorDia[claveFecha]) {
           vuelosAgrupadosPorDia[claveFecha] = [];
         }
@@ -277,7 +316,6 @@
 
       diasOrdenados.forEach(dia => {
         const vuelosDelDia = vuelosAgrupadosPorDia[dia];
-        
         const seccion = document.createElement('div');
         seccion.className = 'seccion-dia';
 
@@ -292,13 +330,9 @@
         let filasHtml = `
           <thead>
             <tr>
-              <th style="width: 10%">Hora</th>
-              <th style="width: 15%">País</th>
-              <th style="width: 10%">Cód.Aer.</th>
-              <th style="width: 25%">Aer.</th>
-              <th style="width: 12%">Vuelo</th>
-              <th style="width: 13%">Aerolínea</th>
-              <th style="width: 15%">Estado</th>
+              <th style="width: 33%">Hora</th>
+              <th style="width: 33%">Cód.Aer.</th>
+              <th style="width: 33%">Vuelo</th>
             </tr>
           </thead>
           <tbody>
@@ -313,25 +347,12 @@
           if (f.time.estimated && f.time.estimated.departure) {
             const timestampEstimado = f.time.estimated.departure * 1000;
             const horaEstimada = new Date(timestampEstimado).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
-            
             if (f.time.estimated.departure !== f.time.scheduled.departure) {
               estadoFinal += ` <span class="hora-estimada">(${horaEstimada})</span>`;
             }
           }
 
-          // Uso de la nueva función para obtener el país de forma segura
-          const paisDestino = obtenerPais(f);
           const codigoDestino = f.airport.destination ? f.airport.destination.code.iata : '---';
-          
-          // Limpiamos el nombre del aeropuerto si venía con el país incluido en el string
-          let nombreAeropuerto = f.airport.destination ? f.airport.destination.name : 'Destino Desconocido';
-          if (nombreAeropuerto.includes(',')) {
-            nombreAeropuerto = nombreAeropuerto.split(',')[0].trim();
-          }
-          
-          const aerolinea = f.airline ? f.airline.name : 'Desconocida';
-          const iataAerolinea = (f.airline && f.airline.code) ? f.airline.code.iata : '';
-
           let numeroVueloBase = '';
           if (f.identification) {
             if (f.identification.number && typeof f.identification.number !== 'object') {
@@ -344,6 +365,7 @@
           }
 
           let codigoVuelo = numeroVueloBase || 'Privado';
+          const iataAerolinea = (f.airline && f.airline.code) ? f.airline.code.iata : '';
 
           if (iataAerolinea && numeroVueloBase) {
             let limpio = numeroVueloBase.replace(/\s+/g, '');
@@ -357,12 +379,8 @@
           filasHtml += `
             <tr class="fila-vuelo">
               <td class="hora">${horaSalida}</td>
-              <td>${paisDestino}</td>
               <td class="codigo-aeropuerto">${codigoDestino}</td>
-              <td>${nombreAeropuerto}</td>
               <td class="vuelo">${codigoVuelo.toUpperCase()}</td>
-              <td>${aerolinea}</td>
-              <td>${estadoFinal}</td>
             </tr>
           `;
         });
@@ -377,15 +395,12 @@
     async function cargarPanelFlightradar() {
       const loading = document.getElementById('loading-view');
       const statusTxt = document.getElementById('status-txt');
-
       const URL = "https://api.flightradar24.com/common/v1/airport.json?code=hhn&plugin[]=&plugin-setting[schedule][mode]=departures&plugin-setting[schedule][timestamp]=" + Math.floor(Date.now() / 1000);
 
       try {
         const respuesta = await fetch(URL);
         const data = await respuesta.json();
-
         vuelosCargados = data.result.response.airport.pluginData.schedule.departures.data || [];
-
         loading.style.display = 'none';
 
         actualizarDesplegableAerolineas(vuelosCargados);
@@ -393,7 +408,6 @@
 
         const ahora = new Date();
         statusTxt.innerText = `PANEL EN VIVO - ACTUALIZADO: ${ahora.toLocaleTimeString('es-ES')}`;
-
       } catch (error) {
         console.error(error);
         loading.style.display = 'block';
@@ -402,7 +416,6 @@
     }
 
     document.getElementById('filtro-aerolinea').addEventListener('change', renderizarTabla);
-
     cargarPanelFlightradar();
     setInterval(cargarPanelFlightradar, 15000);
   </script>
