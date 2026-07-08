@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Salidas en Vivo - Frankfurt-Hahn (HHN)</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-color: #f59e0b;
+    }
+
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      background-color: var(--panel-bg);
+      padding: 20px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 5px solid var(--accent-color);
+    }
+
+    header h1 { margin: 0; font-size: 1.4rem; text-transform: uppercase; letter-spacing: 2px; }
+    header p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted); }
+
+    .filtro-contenedor {
+      margin-bottom: 20px;
+      background-color: var(--panel-bg);
+      padding: 15px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .filtro-contenedor label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+    }
+
+    .filtro-contenedor select {
+      background-color: #0f172a;
+      color: var(--accent-color);
+      border: 1px solid #334155;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .seccion-dia {
+      margin-bottom: 35px;
+    }
+
+    .titulo-dia {
+      background-color: #0f172a;
+      color: #ffffff;
+      padding: 10px 15px;
+      font-size: 1.1rem;
+      border-left: 4px solid #38bdf8;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tabla-vuelos {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: var(--panel-bg);
+      margin-bottom: 10px;
+    }
+
+    .tabla-vuelos th {
+      background-color: #1e293b;
+      color: var(--accent-color);
+      text-align: left;
+      padding: 12px;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      border-bottom: 2px solid #0f172a;
+    }
+
+    .fila-vuelo {
+      border-bottom: 1px solid #334155;
+    }
+
+    .fila-vuelo td {
+      padding: 14px 12px;
+      font-size: 1rem;
+    }
+
+    .hora { color: var(--accent-color); font-weight: bold; }
+    .vuelo { color: #38bdf8; font-weight: bold; }
+    .codigo-aeropuerto { font-weight: bold; color: #f8fafc; }
+    
+    .loading, .error-msg {
+      text-align: center; padding: 40px; background: var(--panel-bg); border-radius: 4px;
+    }
+    .error-msg { color: #ef4444; }
+    
+    .hora-estimada {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .retraso {
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>SALIDAS EN TIEMPO REAL - FRANKFORT-HAHN (HHN)</h1>
+      <p id="status-txt">Conectando con el radar del aeropuerto...</p>
+    </header>
+
+    <div class="filtro-contenedor">
+      <label for="filtro-aerolinea">Filtrar por Aerolínea:</label>
+      <select id="filtro-aerolinea">
+        <option value="TODAS">-- TODAS LAS AEROLÍNEAS --</option>
+      </select>
+    </div>
+
+    <div id="loading-view" class="loading">Sincronizando panel de vuelos activos...</div>
+    
+    <div id="contenedor-paneles"></div>
+  </div>
+
+  <script>
+    let vuelosCargados = [];
+
+    // Diccionario de ayuda para aeropuertos comunes desde HHN si la API no da el país
+    const mapaPaises = {
+'PMI': 'España', 'BCN': 'España', 'ALC': 'España', 'AGP': 'España', 'TFS': 'España', 
+      'ACE': 'España', 'IBZ': 'España', 'VLC': 'España', 'SVQ': 'España', 'SCQ': 'España',
+      'MAD': 'España', 'GRO': 'España', 'REU': 'España',
+      'BGY': 'Italia', 'CIA': 'Italia', 'VCE': 'Italia', 'TSF': 'Italia', 'NAP': 'Italia', 
+      'PMO': 'Italia', 'BLQ': 'Italia', 'BRI': 'Italia', 'CTA': 'Italia', 'PSA': 'Italia',
+      'AHO': 'Italia', 'CAG': 'Italia', 'CRV': 'Italia',
+      'STN': 'Reino Unido', 'EDI': 'Reino Unido', 'MAN': 'Reino Unido',
+      'BHX': 'Reino Unido', 'DUB': 'Irlanda', 'SNN': 'Irlanda',
+      'OPO': 'Portugal', 'LIS': 'Portugal', 'FAO': 'Portugal',
+      'CHQ': 'Grecia', 'CFU': 'Grecia', 'SKG': 'Grecia', 'ATH': 'Grecia', 'RHO': 'Grecia',
+      'OTP': 'Rumanía', 'CLJ': 'Rumanía', 'TSR': 'Rumanía', 'IAS': 'Rumanía', 'SBZ': 'Rumanía',
+      'WAW': 'Polonia', 'KRK': 'Polonia', 'WRO': 'Polonia', 'GDN': 'Polonia', 'KTW': 'Polonia',
+      'BUD': 'Hungría', 'SOF': 'Bulgaria', 'BOJ': 'Bulgaria', 'VAR': 'Bulgaria',
+      'TZL': 'Bosnia y Herz.', 'SJJ': 'Bosnia y Herz.', 'SKP': 'Macedonia', 'KUN': 'Lituania',
+      'VNO': 'Lituania', 'RIX': 'Letonia', 'TLL': 'Estonia', 'KIV': 'Moldavia',
+      'FEZ': 'Marruecos', 'RAK': 'Marruecos', 'NDR': 'Marruecos', 'TNG': 'Marruecos', 
+      'OUD': 'Marruecos', 'AGA': 'Marruecos', 'CMN': 'Marruecos', 'RBA': 'Marruecos', 'DJE': 'Túnez', 'MIR': 'Túnez',
+      'FRA': 'Alemania', 'MUC': 'Alemania', 'HHN': 'Alemania', 'SAW': 'Turquía', 'AYT': 'Turquía',
+      'RJK': 'Croacia', 'ZAD': 'Croacia'
+    };
+
+    function obtenerPais(f) {
+      // 1. Intentar leerlo si viene en la API
+      if (f.airport.destination && f.airport.destination.country && f.airport.destination.country.name) {
+        return f.airport.destination.country.name;
+      }
+      
+      // 2. Buscar en nuestro mapa local por código IATA
+      const iata = f.airport.destination ? f.airport.destination.code.iata : '';
+      if (mapaPaises[iata]) {
+        return mapaPaises[iata];
+      }
+
+      // 3. Intentar deducirlo si el nombre del aeropuerto incluye una coma (ej: "Palma de Mallorca, Spain")
+      const nombre = f.airport.destination ? f.airport.destination.name : '';
+      if (nombre.includes(',')) {
+        const partes = nombre.split(',');
+        return partes[partes.length - 1].trim();
+      }
+
+      return '---';
+    }
+
+    function traducirEstado(estadoIngles) {
+      if (!estadoIngles) return 'Programado';
+      const texto = estadoIngles.toLowerCase();
+      
+      if (texto.includes('departed')) return 'Despegó';
+      if (texto.includes('estimated')) return 'Estimado';
+      if (texto.includes('delayed')) return '<span class="retraso">Retrasado</span>';
+      if (texto.includes('canceled') || texto.includes('cancelled')) return 'Cancelado';
+      if (texto.includes('landed')) return 'Aterrizó';
+      if (texto.includes('scheduled')) return 'Programado';
+      if (texto.includes('board') || texto.includes('gate')) return 'Embarcando';
+      
+      return estadoIngles;
+    }
+
+    function actualizarDesplegableAerolineas(vuelos) {
+      const select = document.getElementById('filtro-aerolinea');
+      const opcionSeleccionada = select.value;
+      
+      select.innerHTML = '<option value="TODAS">-- TODAS LAS AEROLÍNEAS --</option>';
+      
+      const aerolineasUnicas = [...new Set(vuelos.map(item => item.flight.airline ? item.flight.airline.name : 'Desconocida'))].sort();
+      
+      aerolineasUnicas.forEach(aerolinea => {
+        const option = document.createElement('option');
+        option.value = aerolinea;
+        option.textContent = aerolinea;
+        select.appendChild(option);
+      });
+
+      if (aerolineasUnicas.includes(opcionSeleccionada)) {
+        select.value = opcionSeleccionada;
+      }
+    }
+
+    function obtenerNombreDia(fechaStr) {
+      const hoy = new Date();
+      const mañana = new Date();
+      mañana.setDate(hoy.getDate() + 1);
+
+      const fechaVuelo = new Date(fechaStr + "T00:00:00");
+
+      if (fechaVuelo.toDateString() === hoy.toDateString()) {
+        return `HOY - ${fechaVuelo.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+      } else if (fechaVuelo.toDateString() === mañana.toDateString()) {
+        return `MAÑANA - ${fechaVuelo.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+      } else {
+        return fechaVuelo.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+      }
+    }
+
+    function renderizarTabla() {
+      const contenedor = document.getElementById('contenedor-paneles');
+      const filtroSeleccionado = document.getElementById('filtro-aerolinea').value;
+      
+      contenedor.innerHTML = '';
+
+      const vuelosFiltrados = vuelosCargados.filter(item => {
+        if (filtroSeleccionado === 'TODAS') return true;
+        const aerolineaVuelo = item.flight.airline ? item.flight.airline.name : 'Desconocida';
+        return aerolineaVuelo === filtroSeleccionado;
+      });
+
+      if (vuelosFiltrados.length === 0) {
+        contenedor.innerHTML = '<div class="loading">No hay vuelos registrados para los criterios seleccionados.</div>';
+        return;
+      }
+
+      const vuelosAgrupadosPorDia = {};
+      
+      vuelosFiltrados.forEach(item => {
+        const timestamp = item.flight.time.scheduled.departure * 1000;
+        const fechaObj = new Date(timestamp);
+        const claveFecha = fechaObj.toISOString().split('T')[0]; 
+
+        if (!vuelosAgrupadosPorDia[claveFecha]) {
+          vuelosAgrupadosPorDia[claveFecha] = [];
+        }
+        vuelosAgrupadosPorDia[claveFecha].push(item);
+      });
+
+      const diasOrdenados = Object.keys(vuelosAgrupadosPorDia).sort();
+
+      diasOrdenados.forEach(dia => {
+        const vuelosDelDia = vuelosAgrupadosPorDia[dia];
+        
+        const seccion = document.createElement('div');
+        seccion.className = 'seccion-dia';
+
+        const titulo = document.createElement('div');
+        titulo.className = 'titulo-dia';
+        titulo.textContent = obtenerNombreDia(dia);
+        seccion.appendChild(titulo);
+
+        const tabla = document.createElement('table');
+        tabla.className = 'tabla-vuelos';
+        
+        let filasHtml = `
+          <thead>
+            <tr>
+              <th style="width: 10%">Hora</th>
+              <th style="width: 15%">País</th>
+              <th style="width: 10%">Cód.Aer.</th>
+              <th style="width: 25%">Aer.</th>
+              <th style="width: 12%">Vuelo</th>
+              <th style="width: 13%">Aerolínea</th>
+              <th style="width: 15%">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+        `;
+
+        vuelosDelDia.forEach(item => {
+          const f = item.flight;
+          const timestamp = f.time.scheduled.departure * 1000;
+          const horaSalida = new Date(timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+
+          let estadoFinal = traducirEstado(f.status.text);
+          if (f.time.estimated && f.time.estimated.departure) {
+            const timestampEstimado = f.time.estimated.departure * 1000;
+            const horaEstimada = new Date(timestampEstimado).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+            
+            if (f.time.estimated.departure !== f.time.scheduled.departure) {
+              estadoFinal += ` <span class="hora-estimada">(${horaEstimada})</span>`;
+            }
+          }
+
+          // Uso de la nueva función para obtener el país de forma segura
+          const paisDestino = obtenerPais(f);
+          const codigoDestino = f.airport.destination ? f.airport.destination.code.iata : '---';
+          
+          // Limpiamos el nombre del aeropuerto si venía con el país incluido en el string
+          let nombreAeropuerto = f.airport.destination ? f.airport.destination.name : 'Destino Desconocido';
+          if (nombreAeropuerto.includes(',')) {
+            nombreAeropuerto = nombreAeropuerto.split(',')[0].trim();
+          }
+          
+          const aerolinea = f.airline ? f.airline.name : 'Desconocida';
+          const iataAerolinea = (f.airline && f.airline.code) ? f.airline.code.iata : '';
+
+          let numeroVueloBase = '';
+          if (f.identification) {
+            if (f.identification.number && typeof f.identification.number !== 'object') {
+              numeroVueloBase = f.identification.number;
+            } else if (f.identification.number && f.identification.number.default) {
+              numeroVueloBase = f.identification.number.default;
+            } else if (f.identification.callsign && typeof f.identification.callsign !== 'object') {
+              numeroVueloBase = f.identification.callsign;
+            }
+          }
+
+          let codigoVuelo = numeroVueloBase || 'Privado';
+
+          if (iataAerolinea && numeroVueloBase) {
+            let limpio = numeroVueloBase.replace(/\s+/g, '');
+            if (!limpio.toUpperCase().startsWith(iataAerolinea.toUpperCase())) {
+              codigoVuelo = `${iataAerolinea}${limpio}`;
+            } else {
+              codigoVuelo = limpio;
+            }
+          }
+
+          filasHtml += `
+            <tr class="fila-vuelo">
+              <td class="hora">${horaSalida}</td>
+              <td>${paisDestino}</td>
+              <td class="codigo-aeropuerto">${codigoDestino}</td>
+              <td>${nombreAeropuerto}</td>
+              <td class="vuelo">${codigoVuelo.toUpperCase()}</td>
+              <td>${aerolinea}</td>
+              <td>${estadoFinal}</td>
+            </tr>
+          `;
+        });
+
+        filasHtml += '</tbody>';
+        tabla.innerHTML = filasHtml;
+        seccion.appendChild(tabla);
+        contenedor.appendChild(seccion);
+      });
+    }
+
+    async function cargarPanelFlightradar() {
+      const loading = document.getElementById('loading-view');
+      const statusTxt = document.getElementById('status-txt');
+
+      const URL = "https://api.flightradar24.com/common/v1/airport.json?code=hhn&plugin[]=&plugin-setting[schedule][mode]=departures&plugin-setting[schedule][timestamp]=" + Math.floor(Date.now() / 1000);
+
+      try {
+        const respuesta = await fetch(URL);
+        const data = await respuesta.json();
+
+        vuelosCargados = data.result.response.airport.pluginData.schedule.departures.data || [];
+
+        loading.style.display = 'none';
+
+        actualizarDesplegableAerolineas(vuelosCargados);
+        renderizarTabla();
+
+        const ahora = new Date();
+        statusTxt.innerText = `PANEL EN VIVO - ACTUALIZADO: ${ahora.toLocaleTimeString('es-ES')}`;
+
+      } catch (error) {
+        console.error(error);
+        loading.style.display = 'block';
+        loading.innerHTML = `<div class="error-msg">Error al conectar con el radar del aeropuerto. Reconectando automáticamente...</div>`;
+      }
+    }
+
+    document.getElementById('filtro-aerolinea').addEventListener('change', renderizarTabla);
+
+    cargarPanelFlightradar();
+    setInterval(cargarPanelFlightradar, 15000);
+  </script>
+</body>
+</html>
