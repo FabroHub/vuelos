@@ -216,6 +216,7 @@
 
   <script>
     let vuelosCargados = [];
+    let primeraCarga = true; // Flag para forzar la selección inicial
 
     const mapaPaises = {
       'PMI': 'España', 'BCN': 'España', 'ALC': 'España', 'AGP': 'España', 'TFS': 'España', 
@@ -223,9 +224,9 @@
       'MAD': 'España', 'GRO': 'España', 'REU': 'España',
       'BGY': 'Italia', 'CIA': 'Italia', 'VCE': 'Italia', 'TSF': 'Italia', 'NAP': 'Italia', 
       'PMO': 'Italia', 'BLQ': 'Italia', 'BRI': 'Italia', 'CTA': 'Italia', 'PSA': 'Italia',
-      'AHO': 'Italia', 'CAG': 'Italia', 'CRV': 'Italia',
+      'AHO': 'Italia', 'CAG': 'Italia', 'CRV': 'Italia', 'PSR': 'Italia',
       'STN': 'Reino Unido', 'EDI': 'Reino Unido', 'MAN': 'Reino Unido',
-      'BHX': 'Reino Unido', 'DUB': 'Irlanda', 'SNN': 'Irlanda',
+      'BHX': 'Reino Unido', 'DUB': 'Irlanda', 'SNN': 'Irlanda', 'KIR': 'Irlanda',
       'OPO': 'Portugal', 'LIS': 'Portugal', 'FAO': 'Portugal',
       'CHQ': 'Grecia', 'CFU': 'Grecia', 'SKG': 'Grecia', 'ATH': 'Grecia', 'RHO': 'Grecia',
       'OTP': 'Rumanía', 'CLJ': 'Rumanía', 'TSR': 'Rumanía', 'IAS': 'Rumanía', 'SBZ': 'Rumanía',
@@ -236,7 +237,8 @@
       'FEZ': 'Marruecos', 'RAK': 'Marruecos', 'NDR': 'Marruecos', 'TNG': 'Marruecos', 
       'OUD': 'Marruecos', 'AGA': 'Marruecos', 'CMN': 'Marruecos', 'RBA': 'Marruecos', 'DJE': 'Túnez', 'MIR': 'Túnez',
       'FRA': 'Alemania', 'MUC': 'Alemania', 'HHN': 'Alemania', 'SAW': 'Turquía', 'AYT': 'Turquía',
-      'RJK': 'Croacia', 'ZAD': 'Croacia'
+      'RJK': 'Croacia', 'ZAD': 'Croacia', 'TIA': 'Albania', 'DWC': 'Emiratos Árabes Unidos',
+      'DMM': 'Arabia Saudita', 'GYD': 'Azerbaiyán', 'ICN': 'Corea del Sur'
     };
 
     function obtenerPais(f) {
@@ -262,7 +264,8 @@
 
     function actualizarDesplegableAerolineas(vuelos) {
       const select = document.getElementById('filtro-aerolinea');
-      const opcionSeleccionada = select.value;
+      let opcionSeleccionada = select.value;
+      
       select.innerHTML = '<option value="TODAS">-- TODAS LAS AEROLÍNEAS --</option>';
       const aerolineasUnicas = [...new Set(vuelos.map(item => item.flight.airline ? item.flight.airline.name : 'Desconocida'))].sort();
       
@@ -272,6 +275,15 @@
         option.textContent = aerolinea;
         select.appendChild(option);
       });
+
+      // Si es la primera carga del script, intentamos forzar Ryanair
+      if (primeraCarga) {
+        const ryanairExiste = aerolineasUnicas.some(a => a.toLowerCase() === 'ryanair');
+        if (ryanairExiste) {
+          opcionSeleccionada = aerolineasUnicas.find(a => a.toLowerCase() === 'ryanair');
+        }
+        primeraCarga = false;
+      }
 
       if (aerolineasUnicas.includes(opcionSeleccionada)) {
         select.value = opcionSeleccionada;
@@ -293,7 +305,6 @@
       }
     }
 
-    // Función para alternar el despliegue al hacer clic
     function toggleDetalle(idDetalle) {
       const elemento = document.getElementById(idDetalle);
       if (elemento) {
@@ -346,8 +357,8 @@
         let filasHtml = `
           <thead>
             <tr>
-              <th style="width: 33%">Horarios</th>
-              <th style="width: 33%">Cód.Aer.</th>
+              <th style="width: 33%">Hora</th>
+              <th style="width: 33%">IATA</th>
               <th style="width: 33%">Vuelo</th>
             </tr>
           </thead>
@@ -360,13 +371,11 @@
           const timestampMS = f.time.scheduled.departure * 1000;
           const dateObj = new Date(timestampMS);
 
-          // Horas Originales
           const horaLocal = dateObj.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
           const hrsZ = String(dateObj.getUTCHours()).padStart(2, '0');
           const minsZ = String(dateObj.getUTCMinutes()).padStart(2, '0');
           const horaZulu = `${hrsZ}:${minsZ}Z`;
 
-          // Hora -45 minutos
           const dateObj45 = new Date(timestampMS - 2700000);
           const horaMenos45 = dateObj45.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
 
@@ -399,7 +408,6 @@
             }
           }
 
-          // Generamos IDs únicos para vincular las filas con sus respectivos desplegables
           const idDetalle = `detalle-${dia}-${indice}`;
 
           filasHtml += `
@@ -407,7 +415,6 @@
               <td class="celda-hora">
                 <span class="hora-local">${horaLocal}</span>
                 <span class="hora-zulu">${horaZulu}</span>
-                <span class="hora-previa">(-45m: ${horaMenos45})</span>
               </td>
               <td class="codigo-aeropuerto">${codigoDestino}</td>
               <td class="vuelo">${codigoVuelo.toUpperCase()}</td>
@@ -415,6 +422,7 @@
             <tr class="fila-detalle" id="${idDetalle}">
               <td colspan="3">
                 <div class="contenedor-detalle">
+                  <div class="detalle-item"><strong>Check-In:</strong> ${horaMenos45}</div>
                   <div class="detalle-item"><strong>Aerolínea:</strong> ${nombreAerolinea}</div>
                   <div class="detalle-item"><strong>Destino:</strong> ${nombreAeropuerto} (${paisDestino})</div>
                   <div class="detalle-item"><strong>Estado:</strong> ${estadoVuelo}</div>
@@ -456,7 +464,7 @@
 
     document.getElementById('filtro-aerolinea').addEventListener('change', renderizarTabla);
     cargarPanelFlightradar();
-    setInterval(cargarPanelFlightradar, 15000);
+    setInterval(cargarPanelFlightradar, 60000);
   </script>
 </body>
 </html>
