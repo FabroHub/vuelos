@@ -99,82 +99,98 @@
 
     .fila-vuelo {
       border-bottom: 1px solid #334155;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .fila-vuelo:hover {
+      background-color: #334155;
     }
 
     .fila-vuelo td {
       padding: 14px 12px;
       font-size: 1rem;
+      vertical-align: middle;
     }
 
-    .hora { color: var(--accent-color); font-weight: bold; }
+    .celda-hora {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hora-local { 
+      color: var(--accent-color); 
+      font-weight: bold; 
+      font-size: 1.05rem;
+    }
+    
+    .hora-zulu { 
+      color: var(--text-main); 
+      font-size: 0.85rem; 
+      margin-top: 2px;
+    }
+
+    .hora-previa {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 2px;
+      font-style: italic;
+    }
+
     .vuelo { color: #38bdf8; font-weight: bold; }
     .codigo-aeropuerto { font-weight: bold; color: #f8fafc; }
+
+    /* --- ESTILOS DEL DESPLEGABLE (DETALLES) --- */
+    .fila-detalle {
+      background-color: #0f172a;
+      display: none; /* Oculto por defecto */
+    }
+
+    .fila-detalle.abierto {
+      display: table-row; /* Se muestra al activarse */
+    }
+
+    .contenedor-detalle {
+      padding: 15px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      border-left: 3px solid var(--accent-color);
+    }
+
+    .detalle-item {
+      margin-bottom: 6px;
+    }
+
+    .detalle-item strong {
+      color: var(--accent-color);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+
+    .retraso { color: #ef4444; font-weight: bold; }
+    .estado-ok { color: #10b981; font-weight: bold; }
     
     .loading, .error-msg {
       text-align: center; padding: 40px; background: var(--panel-bg); border-radius: 4px;
     }
     .error-msg { color: #ef4444; }
-    
-    .hora-estimada {
-      color: #10b981;
-      font-weight: bold;
-    }
-    .retraso {
-      color: #ef4444;
-    }
 
     /* --- RESPONSIVE PARA DISPOSITIVOS DE MENOS DE 425PX --- */
     @media (max-width: 425px) {
-      body {
-        padding: 10px;
-      }
-      
-      header {
-        padding: 15px 10px;
-        margin-bottom: 15px;
-      }
-
-      header h1 {
-        font-size: 1.1rem;
-        letter-spacing: 1px;
-      }
-
-      header p {
-        font-size: 0.75rem;
-      }
-
-      .filtro-contenedor {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-        padding: 12px;
-      }
-
-      .filtro-contenedor label {
-        font-size: 0.8rem;
-      }
-
-      .filtro-contenedor select {
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 0.85rem;
-        padding: 10px;
-      }
-
-      .titulo-dia {
-        font-size: 0.95rem;
-        padding: 8px 10px;
-      }
-
-      .tabla-vuelos th {
-        padding: 10px 8px;
-        font-size: 0.8rem;
-      }
-
-      .fila-vuelo td {
-        padding: 12px 8px;
-        font-size: 0.9rem;
-      }
+      body { padding: 10px; }
+      header { padding: 15px 10px; margin-bottom: 15px; }
+      header h1 { font-size: 1.1rem; letter-spacing: 1px; }
+      header p { font-size: 0.75rem; }
+      .filtro-contenedor { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+      .filtro-contenedor label { font-size: 0.8rem; }
+      .filtro-contenedor select { width: 100%; box-sizing: border-box; font-size: 0.85rem; padding: 10px; }
+      .titulo-dia { font-size: 0.95rem; padding: 8px 10px; }
+      .tabla-vuelos th { padding: 10px 8px; font-size: 0.8rem; }
+      .fila-vuelo td { padding: 12px 8px; font-size: 0.9rem; }
+      .hora-local { font-size: 0.95rem; }
+      .hora-zulu { font-size: 0.8rem; }
+      .hora-previa { font-size: 0.7rem; }
+      .contenedor-detalle { padding: 10px; font-size: 0.85rem; }
     }
   </style>
 </head>
@@ -182,7 +198,7 @@
 
   <div class="container">
     <header>
-      <h1>SALIDAS EN TIEMPO REAL - FRANKFORT-HAHN (HHN)</h1>
+      <h1>SALIDAS EN TIEMPO REAL - FRANKFURT-HAHN (HHN)</h1>
       <p id="status-txt">Conectando con el radar del aeropuerto...</p>
     </header>
 
@@ -228,27 +244,19 @@
         return f.airport.destination.country.name;
       }
       const iata = f.airport.destination ? f.airport.destination.code.iata : '';
-      if (mapaPaises[iata]) {
-        return mapaPaises[iata];
-      }
-      const nombre = f.airport.destination ? f.airport.destination.name : '';
-      if (nombre.includes(',')) {
-        const partes = nombre.split(',');
-        return partes[partes.length - 1].trim();
-      }
-      return '---';
+      return mapaPaises[iata] || '---';
     }
 
     function traducirEstado(estadoIngles) {
-      if (!estadoIngles) return 'Programado';
+      if (!estadoIngles) return '<span class="estado-ok">Programado</span>';
       const texto = estadoIngles.toLowerCase();
-      if (texto.includes('departed')) return 'Despegó';
+      if (texto.includes('departed')) return '<span class="estado-ok">Despegó</span>';
       if (texto.includes('estimated')) return 'Estimado';
       if (texto.includes('delayed')) return '<span class="retraso">Retrasado</span>';
-      if (texto.includes('canceled') || texto.includes('cancelled')) return 'Cancelado';
-      if (texto.includes('landed')) return 'Aterrizó';
-      if (texto.includes('scheduled')) return 'Programado';
-      if (texto.includes('board') || texto.includes('gate')) return 'Embarcando';
+      if (texto.includes('canceled') || texto.includes('cancelled')) return '<span class="retraso">Cancelado</span>';
+      if (texto.includes('landed')) return '<span class="estado-ok">Aterrizó</span>';
+      if (texto.includes('scheduled')) return '<span class="estado-ok">Programado</span>';
+      if (texto.includes('board') || texto.includes('gate')) return '<span class="accent">Embarcando</span>';
       return estadoIngles;
     }
 
@@ -282,6 +290,14 @@
         return `MAÑANA - ${fechaVuelo.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
       } else {
         return fechaVuelo.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+      }
+    }
+
+    // Función para alternar el despliegue al hacer clic
+    function toggleDetalle(idDetalle) {
+      const elemento = document.getElementById(idDetalle);
+      if (elemento) {
+        elemento.classList.toggle('abierto');
       }
     }
 
@@ -330,7 +346,7 @@
         let filasHtml = `
           <thead>
             <tr>
-              <th style="width: 33%">Hora</th>
+              <th style="width: 33%">Horarios</th>
               <th style="width: 33%">Cód.Aer.</th>
               <th style="width: 33%">Vuelo</th>
             </tr>
@@ -338,21 +354,28 @@
           <tbody>
         `;
 
-        vuelosDelDia.forEach(item => {
+        vuelosDelDia.forEach((item, indice) => {
           const f = item.flight;
-          const timestamp = f.time.scheduled.departure * 1000;
-          const horaSalida = new Date(timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+          
+          const timestampMS = f.time.scheduled.departure * 1000;
+          const dateObj = new Date(timestampMS);
 
-          let estadoFinal = traducirEstado(f.status.text);
-          if (f.time.estimated && f.time.estimated.departure) {
-            const timestampEstimado = f.time.estimated.departure * 1000;
-            const horaEstimada = new Date(timestampEstimado).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
-            if (f.time.estimated.departure !== f.time.scheduled.departure) {
-              estadoFinal += ` <span class="hora-estimada">(${horaEstimada})</span>`;
-            }
-          }
+          // Horas Originales
+          const horaLocal = dateObj.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+          const hrsZ = String(dateObj.getUTCHours()).padStart(2, '0');
+          const minsZ = String(dateObj.getUTCMinutes()).padStart(2, '0');
+          const horaZulu = `${hrsZ}:${minsZ}Z`;
+
+          // Hora -45 minutos
+          const dateObj45 = new Date(timestampMS - 2700000);
+          const horaMenos45 = dateObj45.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
 
           const codigoDestino = f.airport.destination ? f.airport.destination.code.iata : '---';
+          const nombreAeropuerto = f.airport.destination ? f.airport.destination.name : 'Desconocido';
+          const paisDestino = obtenerPais(f);
+          const nombreAerolinea = f.airline ? f.airline.name : 'Desconocida';
+          const estadoVuelo = traducirEstado(item.status ? item.status.text : '');
+
           let numeroVueloBase = '';
           if (f.identification) {
             if (f.identification.number && typeof f.identification.number !== 'object') {
@@ -376,11 +399,27 @@
             }
           }
 
+          // Generamos IDs únicos para vincular las filas con sus respectivos desplegables
+          const idDetalle = `detalle-${dia}-${indice}`;
+
           filasHtml += `
-            <tr class="fila-vuelo">
-              <td class="hora">${horaSalida}</td>
+            <tr class="fila-vuelo" onclick="toggleDetalle('${idDetalle}')">
+              <td class="celda-hora">
+                <span class="hora-local">${horaLocal}</span>
+                <span class="hora-zulu">${horaZulu}</span>
+                <span class="hora-previa">(-45m: ${horaMenos45})</span>
+              </td>
               <td class="codigo-aeropuerto">${codigoDestino}</td>
               <td class="vuelo">${codigoVuelo.toUpperCase()}</td>
+            </tr>
+            <tr class="fila-detalle" id="${idDetalle}">
+              <td colspan="3">
+                <div class="contenedor-detalle">
+                  <div class="detalle-item"><strong>Aerolínea:</strong> ${nombreAerolinea}</div>
+                  <div class="detalle-item"><strong>Destino:</strong> ${nombreAeropuerto} (${paisDestino})</div>
+                  <div class="detalle-item"><strong>Estado:</strong> ${estadoVuelo}</div>
+                </div>
+              </td>
             </tr>
           `;
         });
