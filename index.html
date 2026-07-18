@@ -37,7 +37,6 @@
     header h1 { margin: 0; font-size: 1.4rem; text-transform: uppercase; letter-spacing: 2px; }
     header p { margin: 5px 0 0 0; font-size: 0.85rem; color: var(--text-muted); }
 
-    /* --- NUEVOS ESTILOS PARA LOS BOTONES DE PESTAÑA --- */
     .selector-modo {
       display: flex;
       gap: 10px;
@@ -191,6 +190,12 @@
       font-size: 0.8rem;
     }
 
+    .separador-detalle {
+      border: 0;
+      border-top: 1px solid #334155;
+      margin: 10px 0;
+    }
+
     .retraso { color: #ef4444; font-weight: bold; }
     .estado-ok { color: #10b981; font-weight: bold; }
     .accent { color: var(--accent-color); font-weight: bold; }
@@ -246,7 +251,7 @@
   <script>
     let vuelosCargados = [];
     let primeraCarga = true;
-    let modoActual = 'departures'; // Puede ser 'departures' o 'arrivals'
+    let modoActual = 'departures'; 
 
     const mapaPaises = {
       'PMI': 'España', 'BCN': 'España', 'ALC': 'España', 'AGP': 'España', 'TFS': 'España', 
@@ -295,7 +300,6 @@
       'Baku': 'Bakú'
     };
 
-    // Función modificada para soportar origen o destino dinámicamente
     function obtenerPais(f) {
       const nodoAeropuerto = modoActual === 'departures' ? f.airport.destination : f.airport.origin;
       if (nodoAeropuerto && nodoAeropuerto.country && nodoAeropuerto.country.name) {
@@ -305,7 +309,6 @@
       return mapaPaises[iata] || '---';
     }
 
-    // Función modificada para soportar origen o destino dinámicamente
     function obtenerCiudad(f) {
       const nodoAeropuerto = modoActual === 'departures' ? f.airport.destination : f.airport.origin;
       if (nodoAeropuerto && nodoAeropuerto.position && nodoAeropuerto.position.region && nodoAeropuerto.position.region.city) {
@@ -371,23 +374,20 @@
     }
 
     function toggleDetalle(idDetalle) {
-  const elemento = document.getElementById(idDetalle);
-  if (elemento) { // <-- Aquí tenía el error, faltaba la 'o' al final
-    elemento.classList.toggle('abierto');
-  }
-}
+      const elemento = document.getElementById(idDetalle);
+      if (elemento) {
+        elemento.classList.toggle('abierto');
+      }
+    }
 
-    // NUEVA FUNCIÓN: Controla el clic en los botones de cambio
     function cambiarModo(nuevoModo) {
       if (modoActual === nuevoModo) return;
       
       modoActual = nuevoModo;
       
-      // Actualizar clases de los botones para el diseño visual
       document.getElementById('btn-salidas').classList.toggle('activo', modoActual === 'departures');
       document.getElementById('btn-llegadas').classList.toggle('activo', modoActual === 'arrivals');
       
-      // Mostrar de nuevo el mensaje de carga y refrescar datos
       const loading = document.getElementById('loading-view');
       loading.style.display = 'block';
       loading.innerHTML = "Sincronizando panel de vuelos activos...";
@@ -414,7 +414,6 @@
 
       const vuelosAgrupadosPorDia = {};
       vuelosFiltrados.forEach(item => {
-        // En "departures" se lee el tiempo de salida; en "arrivals" el tiempo de llegada
         const tiempoVuelo = modoActual === 'departures' ? item.flight.time.scheduled.departure : item.flight.time.scheduled.arrival;
         const timestamp = tiempoVuelo * 1000;
         const fechaObj = new Date(timestamp);
@@ -440,7 +439,6 @@
         const tabla = document.createElement('table');
         tabla.className = 'tabla-vuelos';
         
-        // Cabecera de la tabla cambia dinámicamente su texto secundario (IATA)
         let filasHtml = `
           <thead>
             <tr>
@@ -464,7 +462,17 @@
           const minsZ = String(dateObj.getUTCMinutes()).padStart(2, '0');
           const horaZulu = `${hrsZ}:${minsZ}Z`;
 
-          // Nodo de aeropuerto según el modo
+          // Inyección dinámica de Check-In solo en modo salidas
+          let checkInHtml = '';
+          if (modoActual === 'departures') {
+            const dateObj45 = new Date(timestampMS - 2700000); 
+            const horaMenos45 = dateObj45.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+            checkInHtml = `
+              <div class="detalle-item"><strong>Check-In:</strong> ${horaMenos45}</div>
+              <hr class="separador-detalle">
+            `;
+          }
+
           const nodoAeropuerto = modoActual === 'departures' ? f.airport.destination : f.airport.origin;
           const codigoAeropuerto = nodoAeropuerto ? nodoAeropuerto.code.iata : '---';
           const nombreAeropuerto = nodoAeropuerto ? nodoAeropuerto.name : 'Desconocido';
@@ -514,10 +522,11 @@
             <tr class="fila-detalle" id="${idDetalle}">
               <td colspan="3">
                 <div class="contenedor-detalle">
+                  ${checkInHtml}
                   <div class="detalle-item"><strong>Aerolínea:</strong> ${nombreAerolinea}</div>
                   <div class="detalle-item"><strong>Modelo:</strong> ${modeloAvion}</div>
                   <div class="detalle-item"><strong>Matrícula:</strong> ${matriculaAvion}</div>
-                            
+                              
                   <hr class="separador-detalle">
 
                   <div class="detalle-item"><strong>${modoActual === 'departures' ? 'Destino' : 'Origen'}:</strong> ${nombreAeropuerto}</div>
@@ -543,14 +552,12 @@
       const loading = document.getElementById('loading-view');
       const statusTxt = document.getElementById('status-txt');
       
-      // La URL ahora inyecta dinámicamente el valor de `modoActual` (departures o arrivals)
       const URL = `https://api.flightradar24.com/common/v1/airport.json?code=hhn&plugin[]=&plugin-setting[schedule][mode]=${modoActual}&plugin-setting[schedule][timestamp]=` + Math.floor(Date.now() / 1000);
 
       try {
         const respuesta = await fetch(URL);
         const data = await respuesta.json();
         
-        // Asignamos la lista de vuelos dinámicamente según el objeto que devuelva la API
         vuelosCargados = data.result.response.airport.pluginData.schedule[modoActual].data || [];
         loading.style.display = 'none';
 
